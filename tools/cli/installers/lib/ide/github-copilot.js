@@ -3,6 +3,7 @@ const { BaseIdeSetup } = require('./_base-ide');
 const chalk = require('chalk');
 const inquirer = require('inquirer').default || require('inquirer');
 const { AgentCommandGenerator } = require('./shared/agent-command-generator');
+const { SkillInstaller } = require('./shared/skill-installer');
 
 /**
  * GitHub Copilot setup handler
@@ -124,15 +125,30 @@ class GitHubCopilotSetup extends BaseIdeSetup {
       console.log(chalk.green(`  ✓ Created agent: bmd-custom-${artifact.module}-${artifact.name}`));
     }
 
+    // Install Agent Skills (works with VS Code Copilot and Claude)
+    const skillInstaller = new SkillInstaller();
+    const skillResult = await skillInstaller.installForGitHubCopilot(projectDir, options.selectedModules || []);
+    const skillCount = skillResult.installed;
+
     console.log(chalk.green(`✓ ${this.name} configured:`));
     console.log(chalk.dim(`  - ${agentCount} agents created`));
+    if (skillCount > 0) {
+      console.log(chalk.dim(`  - ${skillCount} agent skills installed`));
+    }
     console.log(chalk.dim(`  - Agents directory: ${path.relative(projectDir, agentsDir)}`));
+    if (skillCount > 0) {
+      console.log(chalk.dim(`  - Skills directory: .github/skills/`));
+    }
     console.log(chalk.dim(`  - VS Code settings configured`));
     console.log(chalk.dim('\n  Agents available in VS Code Chat view'));
+    if (skillCount > 0) {
+      console.log(chalk.dim('  Skills auto-activate when relevant to your prompts'));
+    }
 
     return {
       success: true,
       agents: agentCount,
+      skills: skillCount,
       settings: true,
     };
   }

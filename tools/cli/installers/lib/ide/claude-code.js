@@ -6,6 +6,7 @@ const { getProjectRoot, getSourcePath, getModulePath } = require('../../../lib/p
 const { WorkflowCommandGenerator } = require('./shared/workflow-command-generator');
 const { TaskToolCommandGenerator } = require('./shared/task-tool-command-generator');
 const { AgentCommandGenerator } = require('./shared/agent-command-generator');
+const { SkillInstaller } = require('./shared/skill-installer');
 const {
   loadModuleInjectionConfig,
   shouldApplyInjection,
@@ -172,6 +173,13 @@ class ClaudeCodeSetup extends BaseIdeSetup {
     const taskToolGen = new TaskToolCommandGenerator();
     const taskToolResult = await taskToolGen.generateTaskToolCommands(projectDir, bmadDir);
 
+    // Install Agent Skills (works with VS Code Copilot and Claude)
+    // Claude Code supports both .github/skills/ and .claude/skills/
+    // We install to .github/skills/ for cross-platform compatibility
+    const skillInstaller = new SkillInstaller();
+    const skillResult = await skillInstaller.installForGitHubCopilot(projectDir, options.selectedModules || []);
+    const skillCount = skillResult.installed;
+
     console.log(chalk.green(`✓ ${this.name} configured:`));
     console.log(chalk.dim(`  - ${agentCount} agents installed`));
     if (workflowCommandCount > 0) {
@@ -184,7 +192,14 @@ class ClaudeCodeSetup extends BaseIdeSetup {
         ),
       );
     }
+    if (skillCount > 0) {
+      console.log(chalk.dim(`  - ${skillCount} agent skills installed`));
+    }
     console.log(chalk.dim(`  - Commands directory: ${path.relative(projectDir, bmadCommandsDir)}`));
+    if (skillCount > 0) {
+      console.log(chalk.dim(`  - Skills directory: .github/skills/`));
+      console.log(chalk.dim('  Skills auto-activate when relevant to your prompts'));
+    }
 
     return {
       success: true,
