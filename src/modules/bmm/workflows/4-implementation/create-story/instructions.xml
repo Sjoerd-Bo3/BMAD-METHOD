@@ -348,12 +348,12 @@
     <!-- Check if tracking system is configured -->
     <check if="sprint status file exists">
       <action>Load {{sprint_status}} and extract tracking_system configuration</action>
-      <action>Set {{tracking_system}} from sprint-status.yaml (default: github-issues)</action>
+      <action>Set {{tracking_system}} from sprint-status.yaml (default: file-system)</action>
       <action>Extract milestone or iteration name if configured</action>
       <action>Extract epic parent reference (epic_issue_{{epic_num}} or epic_work_item_{{epic_num}})</action>
     </check>
     <check if="sprint status file does NOT exist OR tracking_system not configured">
-      <action>Set {{tracking_system}} = "none"</action>
+      <action>Set {{tracking_system}} = "file-system"</action>
       <output>ℹ️ No tracking system configured - skipping external issue creation</output>
       <action>GOTO workflow end</action>
     </check>
@@ -377,6 +377,7 @@
       
       <!-- Link to parent epic issue if available -->
       <check if="epic_issue_{{epic_num}} exists in sprint-status.yaml">
+        <action>Extract epic_issue_{{epic_num}} from sprint-status.yaml into {{epic_issue_number}}</action>
         <action>Add comment linking to parent epic: gh issue comment {{issue_number}} --body "Part of Epic #{{epic_issue_number}}"</action>
       </check>
       
@@ -402,6 +403,7 @@
       
       <!-- Link to parent epic work item if available -->
       <check if="epic_work_item_{{epic_num}} exists in sprint-status.yaml">
+        <action>Extract epic_work_item_{{epic_num}} from sprint-status.yaml into {{epic_work_item_id}}</action>
         <action>Run: az boards work-item relation add --id {{work_item_id}} --relation-type "System.LinkTypes.Hierarchy-Reverse" --target-id {{epic_work_item_id}} --org {{org_url}}</action>
         <output>✅ Linked to parent Epic #{{epic_work_item_id}}</output>
       </check>
@@ -410,7 +412,7 @@
     </check>
 
     <!-- Unknown provider -->
-    <check if="{{tracking_system}} != 'github-issues' AND {{tracking_system}} != 'azure-devops' AND {{tracking_system}} != 'none'">
+    <check if="{{tracking_system}} != 'github-issues' AND {{tracking_system}} != 'azure-devops' AND {{tracking_system}} != 'file-system'">
       <output>⚠️ Unknown tracking system: {{tracking_system}} - skipping external issue creation</output>
     </check>
   </step>

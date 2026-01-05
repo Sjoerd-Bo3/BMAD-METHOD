@@ -51,7 +51,7 @@ providers:
       create: |
         gh pr create --title "{{story_key}}: {{title}}" --body "{{body}}" --base main
       create_with_closes: |
-        gh pr create --title "{{story_key}}: {{title}}" --body "{{body}}\n\nCloses #{{issue_number}}" --base main
+        gh pr create --title "{{story_key}}: {{title}}" --body "$(printf '%s\n\nCloses #%s' "{{body}}" "{{issue_number}}")" --base main
       comment: |
         gh pr comment {{branch_name}} --body "{{comment_body}}"
       merge: |
