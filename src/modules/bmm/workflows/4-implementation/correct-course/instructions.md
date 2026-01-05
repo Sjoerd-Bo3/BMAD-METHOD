@@ -222,7 +222,7 @@
   <check if="stories removed or descoped in change proposal">
     <action>For each removed story:</action>
     <action>Extract issue_number from sprint-status.yaml tracking_ref</action>
-    <action>Run: gh issue close {{issue_number}} --reason "not planned" --comment "Story descoped via correct-course workflow. Reason: {{descope_reason}}"</action>
+    <action>Run: gh issue close {{issue_number}} --comment "Story descoped via correct-course workflow. Reason: {{descope_reason}}"</action>
     <output>✅ GitHub Issue #{{issue_number}} closed (descoped)</output>
   </check>
 </check>
@@ -244,8 +244,7 @@
   <check if="existing stories modified in change proposal">
     <action>For each modified story:</action>
     <action>Extract work_item_id from sprint-status.yaml tracking_ref</action>
-    <action>Run: az boards work-item update --id {{work_item_id}} --description "{{updated_description}}\n\n**Modified via correct-course: {{change_reason}}**" --org {{org_url}}</action>
-    <action>Add history comment via discussion field update</action>
+    <action>Run: az boards work-item update --id {{work_item_id}} --description "{{updated_description}}\n\n**Modified via correct-course: {{change_reason}}**" --discussion "Modified via correct-course: {{change_reason}}" --org {{org_url}}</action>
     <output>✅ Azure DevOps Work Item #{{work_item_id}} updated</output>
   </check>
   
@@ -253,8 +252,7 @@
   <check if="stories removed or descoped in change proposal">
     <action>For each removed story:</action>
     <action>Extract work_item_id from sprint-status.yaml tracking_ref</action>
-    <action>Run: az boards work-item update --id {{work_item_id}} --state "Removed" --org {{org_url}}</action>
-    <action>Add reason to description</action>
+    <action>Run: az boards work-item update --id {{work_item_id}} --state "Closed" --fields "System.Tags=removed" --description "{{removal_description}}\n\n**Removed via correct-course: {{removal_reason}}**" --org {{org_url}}</action>
     <output>✅ Azure DevOps Work Item #{{work_item_id}} marked as Removed</output>
   </check>
 </check>

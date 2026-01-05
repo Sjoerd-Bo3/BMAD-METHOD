@@ -1373,11 +1373,11 @@ Retrospective document was saved successfully, but {sprint_status_file} may need
   <action>Prepare retrospective summary for issue body</action>
   
   <action>Run: gh issue create --title "Retrospective: Epic {{epic_number}} - {{epic_title}}" --body "{{retrospective_summary}}\n\n## Action Items\n{{action_items_list}}\n\n## Key Insights\n{{key_insights}}\n\n**Retro Date:** {date}\n**Document:** {retrospectives_folder}/epic-{{epic_number}}-retro-{date}.md" --label "retrospective,epic-{{epic_number}}" --milestone "{{milestone}}"</action>
-  <action>Capture issue number</action>
+  <action>Capture retro_issue_number from command output</action>
   
   <!-- Close epic issue if all stories done -->
   <check if="all stories in epic {{epic_number}} are done">
-    <action>Extract epic_issue_{{epic_number}} from sprint-status.yaml</action>
+    <action>Extract epic_issue_{{epic_number}} from sprint-status.yaml into {{epic_issue_number}}</action>
     <check if="epic issue exists">
       <action>Run: gh issue close {{epic_issue_number}} --comment "🎉 Epic {{epic_number}} completed! See retrospective #{{retro_issue_number}}"</action>
       <output>✅ Epic Issue #{{epic_issue_number}} closed</output>
@@ -1398,7 +1398,7 @@ Retrospective document was saved successfully, but {sprint_status_file} may need
   
   <!-- Link to epic and close if all stories done -->
   <check if="all stories in epic {{epic_number}} are done">
-    <action>Extract epic_work_item_{{epic_number}} from sprint-status.yaml</action>
+    <action>Extract epic_work_item_{{epic_number}} from sprint-status.yaml into {{epic_work_item_id}}</action>
     <check if="epic work item exists">
       <action>Run: az boards work-item relation add --id {{work_item_id}} --relation-type "System.LinkTypes.Hierarchy-Reverse" --target-id {{epic_work_item_id}} --org {{org_url}}</action>
       <action>Run: az boards work-item update --id {{epic_work_item_id}} --state "Closed" --org {{org_url}}</action>

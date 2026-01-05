@@ -342,10 +342,10 @@
     <!-- Create Pull Request (provider-aware) -->
     <check if="{{sprint_status}} file exists">
       <action>Load {{sprint_status}} and extract tracking_system configuration</action>
-      <action>Set {{tracking_system}} from sprint-status.yaml (default: github-issues)</action>
+      <action>Set {{tracking_system}} from sprint-status.yaml (default: file-system)</action>
     </check>
     <check if="{{sprint_status}} file does NOT exist OR tracking_system not configured">
-      <action>Set {{tracking_system}} = "none"</action>
+      <action>Set {{tracking_system}} = "file-system"</action>
     </check>
 
     <!-- GitHub PR creation -->
@@ -389,8 +389,8 @@
       <action>Capture PR ID from command output</action>
     </check>
 
-    <check if="{{tracking_system}} == 'none'">
-      <output>ℹ️ No tracking system configured - PR creation skipped</output>
+    <check if="{{tracking_system}} == 'file-system'">
+      <output>ℹ️ No external tracking system configured - PR creation skipped. PR automation requires a sprint_status file for GitHub/Azure DevOps integration.</output>
     </check>
 
     <!-- Enhanced Definition of Done Validation -->
