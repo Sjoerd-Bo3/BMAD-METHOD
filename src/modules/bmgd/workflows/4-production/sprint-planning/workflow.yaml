@@ -21,9 +21,13 @@ variables:
   # Project identification
   project_name: "{config_source}:project_name"
 
-  # Tracking system configuration
-  tracking_system: "file-system" # Options: file-system, Future will support other options from config of mcp such as jira, linear, trello
-  story_location: "{config_source}:implementation_artifacts" # Relative path for file-system, Future will support URL for Jira/Linear/Trello
+  # Tracking system configuration (from config.yaml)
+  tracking_system: "{config_source}:tracking_system" # Options: file-system, github-issues, azure-devops
+  tracking_repo: "{config_source}:tracking_repo" # GitHub: owner/repo format
+  tracking_azure_org: "{config_source}:tracking_azure_org" # Azure DevOps org URL
+  tracking_azure_project: "{config_source}:tracking_azure_project" # Azure DevOps project name
+  sync_tasks_to_devops: "{config_source}:sync_tasks_to_devops" # Create child tasks in DevOps
+  story_location: "{config_source}:implementation_artifacts" # Relative path for story files
   story_location_absolute: "{config_source}:implementation_artifacts" # Absolute path for file operations
 
   # Source files (file-system only)

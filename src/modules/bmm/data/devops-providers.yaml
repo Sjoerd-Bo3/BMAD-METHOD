@@ -37,6 +37,8 @@ providers:
         gh issue create --title "{{story_key}}: {{title}}" --body "$(cat {{story_file}})" --label "story,sprint" --milestone "{{milestone_title}}"
       create_no_milestone: |
         gh issue create --title "{{story_key}}: {{title}}" --body "$(cat {{story_file}})" --label "story,sprint"
+      create_with_tasks: |
+        gh issue create --title "{{story_key}}: {{title}}" --body "{{body_with_task_list}}" --label "story,sprint" --milestone "{{milestone_title}}"
       close: |
         gh issue close {{issue_number}}
       update: |
@@ -45,6 +47,13 @@ providers:
         gh issue edit {{issue_number}} --milestone "{{milestone_title}}"
       list: |
         gh issue list --label "sprint" --state open
+    
+    # Task operations (GitHub uses task lists in issue body - no separate items)
+    # Tasks are embedded as markdown checkboxes in the issue body
+    task:
+      note: "GitHub does not support child issues. Tasks are embedded as markdown task lists in the parent issue body."
+      format: "- [ ] {{task_title}}"
+      subtask_format: "  - [ ] {{subtask_title}}"
     
     # Pull Request operations
     pr:
@@ -112,6 +121,19 @@ providers:
         az boards work-item relation add --id {{work_item_id}} --relation-type "System.LinkTypes.Hierarchy-Reverse" --target-id {{parent_id}} --org {{org_url}}
       list: |
         az boards query --wiql "SELECT [System.Id], [System.Title] FROM workitems WHERE [System.WorkItemType] = 'User Story' AND [System.State] = 'Active'" --org {{org_url}} --project {{project}}
+    
+    # Task operations (Azure DevOps supports child Task work items)
+    task:
+      create: |
+        az boards work-item create --title "{{task_title}}" --type "Task" --description "{{task_description}}" --iteration "{{iteration_path}}" --org {{org_url}} --project {{project}}
+      link_to_story: |
+        az boards work-item relation add --id {{task_id}} --relation-type "System.LinkTypes.Hierarchy-Reverse" --target-id {{story_work_item_id}} --org {{org_url}}
+      create_and_link: |
+        az boards work-item create --title "{{task_title}}" --type "Task" --org {{org_url}} --project {{project}} && az boards work-item relation add --id {{new_task_id}} --relation-type "System.LinkTypes.Hierarchy-Reverse" --target-id {{story_work_item_id}} --org {{org_url}}
+      close: |
+        az boards work-item update --id {{task_id}} --state Closed --org {{org_url}}
+      list_for_story: |
+        az boards query --wiql "SELECT [System.Id], [System.Title] FROM workitems WHERE [System.WorkItemType] = 'Task' AND [System.Parent] = {{story_work_item_id}}" --org {{org_url}} --project {{project}}
     
     # Pull Request operations
     pr:
