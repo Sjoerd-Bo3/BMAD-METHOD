@@ -1057,7 +1057,96 @@ class ConfigCollector {
       };
     }
 
+    // Add conditional display using inquirer's 'when' property
+    // This evaluates conditions like "tracking_system == 'github-issues'"
+    if (item.condition) {
+      const conditionStr = item.condition;
+      question.when = (answers) => {
+        return this.evaluateCondition(conditionStr, answers, moduleName);
+      };
+    }
+
     return question;
+  }
+
+  /**
+   * Evaluate a simple condition expression against current answers
+   * Supports: == (equals), != (not equals)
+   * Example: "tracking_system == 'github-issues'"
+   * @param {string} condition - Condition string to evaluate
+   * @param {Object} answers - Current answers from inquirer
+   * @param {string} moduleName - Current module name
+   * @returns {boolean} True if condition is met
+   */
+  evaluateCondition(condition, answers, moduleName) {
+    // Parse simple conditions like "field == 'value'" or "field != 'value'"
+    const equalsMatch = condition.match(/^\s*(\w+)\s*==\s*'([^']+)'\s*$/);
+    const notEqualsMatch = condition.match(/^\s*(\w+)\s*!=\s*'([^']+)'\s*$/);
+
+    if (equalsMatch) {
+      const [, fieldName, expectedValue] = equalsMatch;
+      const actualValue = this.getFieldValue(fieldName, answers, moduleName);
+      return actualValue === expectedValue;
+    }
+
+    if (notEqualsMatch) {
+      const [, fieldName, expectedValue] = notEqualsMatch;
+      const actualValue = this.getFieldValue(fieldName, answers, moduleName);
+      return actualValue !== expectedValue;
+    }
+
+    // Unknown condition format, default to showing the question
+    return true;
+  }
+
+  /**
+   * Get a field value from answers or collected config
+   * @param {string} fieldName - Field name to look up
+   * @param {Object} answers - Current answers from inquirer
+   * @param {string} moduleName - Current module name
+   * @returns {*} Field value or undefined
+   */
+  getFieldValue(fieldName, answers, moduleName) {
+    // First check current answers with module prefix
+    const prefixedKey = `${moduleName}_${fieldName}`;
+    if (answers[prefixedKey] !== undefined) {
+      return answers[prefixedKey];
+    }
+
+    // Check current answers without prefix
+    if (answers[fieldName] !== undefined) {
+      return answers[fieldName];
+    }
+
+    // Check allAnswers (from previous modules)
+    if (this.allAnswers) {
+      // Try with module prefix
+      if (this.allAnswers[prefixedKey] !== undefined) {
+        return this.allAnswers[prefixedKey];
+      }
+      // Try to find in any module
+      for (const [key, value] of Object.entries(this.allAnswers)) {
+        if (key.endsWith(`_${fieldName}`)) {
+          return value;
+        }
+      }
+    }
+
+    // Check collected config
+    if (this.collectedConfig) {
+      // Check current module first
+      if (this.collectedConfig[moduleName]?.[fieldName] !== undefined) {
+        return this.collectedConfig[moduleName][fieldName];
+      }
+      // Check all modules
+      for (const mod of Object.keys(this.collectedConfig)) {
+        if (mod !== '_meta' && this.collectedConfig[mod]?.[fieldName] !== undefined) {
+          return this.collectedConfig[mod][fieldName];
+        }
+      }
+    }
+
+    return;
   }
 
   /**
