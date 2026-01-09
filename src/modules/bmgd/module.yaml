@@ -80,20 +80,20 @@ tracking_system:
     - value: "azure-devops"
       label: "Azure DevOps - Iterations, work items, and PRs via az CLI"
 
-tracking_repo:
-  prompt: "GitHub repository (owner/repo format) for issue tracking.\nLeave empty if not using GitHub Issues."
+tracking_github_repo:
+  prompt: "GitHub repository (owner/repo format) for issue tracking."
   default: ""
   result: "{value}"
   condition: "tracking_system == 'github-issues'"
 
 tracking_azure_org:
-  prompt: "Azure DevOps organization URL (e.g., https://dev.azure.com/your-org).\nLeave empty if not using Azure DevOps."
+  prompt: "Azure DevOps organization URL (e.g., https://dev.azure.com/your-org)."
   default: ""
   result: "{value}"
   condition: "tracking_system == 'azure-devops'"
 
 tracking_azure_project:
-  prompt: "Azure DevOps project name.\nLeave empty if not using Azure DevOps."
+  prompt: "Azure DevOps project name."
   default: ""
   result: "{value}"
   condition: "tracking_system == 'azure-devops'"

@@ -23,7 +23,7 @@ variables:
 
   # Tracking system configuration (from config.yaml)
   tracking_system: "{config_source}:tracking_system" # Options: file-system, github-issues, azure-devops
-  tracking_repo: "{config_source}:tracking_repo" # GitHub: owner/repo format
+  tracking_github_repo: "{config_source}:tracking_github_repo" # GitHub: owner/repo format
   tracking_azure_org: "{config_source}:tracking_azure_org" # Azure DevOps org URL
   tracking_azure_project: "{config_source}:tracking_azure_project" # Azure DevOps project name
   sync_tasks_to_devops: "{config_source}:sync_tasks_to_devops" # Create child tasks in DevOps
