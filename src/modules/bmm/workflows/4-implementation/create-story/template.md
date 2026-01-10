@@ -2,6 +2,26 @@
 
 Status: ready-for-dev
 
+<!-- Bi-Directional DevOps Sync Metadata -->
+<!-- bmad_id: {{bmad_id}} -->
+<!-- ado_id: (populated after sync to Azure DevOps) -->
+<!-- github_issue: (populated after sync to GitHub Issues) -->
+
+<!-- Sync Tracking -->
+<!-- sync:
+  last_synced_from: repo | ado | github
+  last_synced_at: (ISO 8601 timestamp)
+  sync_hash: (content hash for change detection)
+-->
+
+<!-- Ownership & Multi-User Coordination -->
+<!-- owner:
+  user: (email or username from DevOps system)
+  acquired_at: (ISO 8601 timestamp)
+  lease_hours: 8
+  lease_expires_at: (calculated: acquired_at + lease_hours)
+-->
+
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
 ## Story

@@ -58,6 +58,24 @@
 # Epic tracking references:
 #   epic_issue_1: 40     # GitHub: epic issue number
 #   epic_work_item_1: 100  # Azure DevOps: epic work item ID
+#
+# BI-DIRECTIONAL SYNC METADATA (Optional - enables advanced sync features):
+# =========================================================================
+# Story-level sync metadata for bi-directional DevOps integration:
+#
+# sync_metadata:
+#   1-1-user-authentication:
+#     bmad_id: "550e8400-e29b-41d4-a716-446655440000"  # Immutable UUID
+#     last_synced_from: "ado"  # repo | ado | github | manual
+#     last_synced_at: "2025-01-10T09:30:00Z"
+#     sync_hash: "a1b2c3d4..."  # Content hash for change detection
+#     owner:
+#       user: "john.doe@company.com"
+#       acquired_at: "2025-01-10T08:00:00Z"
+#       lease_hours: 8
+#       lease_expires_at: "2025-01-10T16:00:00Z"
+#
+# See: src/modules/bmm/data/field-ownership-matrix.yaml for field authority rules
 
 # EXAMPLE STRUCTURE (your actual epics/stories will replace these):
 

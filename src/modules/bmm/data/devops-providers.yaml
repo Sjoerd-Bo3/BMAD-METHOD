@@ -76,6 +76,32 @@ providers:
       repo: "owner/repo-name"
       tracking_ref: "issue_number"
       milestone: "Sprint X"
+    
+    # Bi-Directional Sync & Reconciliation Commands
+    sync:
+      # Search for existing issue by bmad_id (using custom field or tag)
+      find_by_bmad_id: |
+        gh issue list --search "bmad:{{bmad_id}}" --json number,title,body --jq '.[0].number'
+      
+      # Get full issue details for sync
+      get_issue_details: |
+        gh issue view {{issue_number}} --json number,title,body,assignees,milestone,labels,state,createdAt,updatedAt
+      
+      # Update issue with sync metadata (via comment with hidden marker)
+      add_sync_marker: |
+        gh issue comment {{issue_number}} --body "<!-- bmad-sync-{{correlation_token}} -->"
+      
+      # Check if sync already applied (loop prevention)
+      check_sync_marker: |
+        gh api repos/{owner}/{repo}/issues/{{issue_number}}/comments --jq '.[] | select(.body | contains("bmad-sync-{{correlation_token}}")) | .id'
+      
+      # Get assignee info
+      get_assignee: |
+        gh issue view {{issue_number}} --json assignees --jq '.assignees[0].login'
+      
+      # Sync ownership from GitHub to BMAD
+      sync_ownership: |
+        gh issue view {{issue_number}} --json assignees,updatedAt --jq '{user: .assignees[0].login, acquired_at: .updatedAt}'
 
   azure-devops:
     description: "Azure DevOps Work Items and Pull Requests via az CLI"
@@ -157,6 +183,48 @@ providers:
       project: "YourProjectName"
       tracking_ref: "work_item_id"
       iteration: "Sprint X"
+    
+    # Bi-Directional Sync & Reconciliation Commands
+    sync:
+      # Search for existing work item by bmad_id (using custom field BMAD.ID)
+      find_by_bmad_id: |
+        az boards query --wiql "SELECT [System.Id] FROM workitems WHERE [BMAD.ID] = '{{bmad_id}}'" --org {{org_url}} --project {{project}} --query "workItems[0].id" -o tsv
+      
+      # Get full work item details for sync
+      get_work_item_details: |
+        az boards work-item show --id {{work_item_id}} --org {{org_url}} --output json
+      
+      # Update work item with custom field BMAD.ID
+      set_bmad_id_field: |
+        az boards work-item update --id {{work_item_id}} --fields "BMAD.ID={{bmad_id}}" --org {{org_url}}
+      
+      # Add sync marker to work item history (loop prevention)
+      add_sync_marker: |
+        az boards work-item update --id {{work_item_id}} --discussion "[bmad-sync-{{correlation_token}}]" --org {{org_url}}
+      
+      # Check if sync already applied
+      check_sync_marker: |
+        az boards work-item show --id {{work_item_id}} --org {{org_url}} --query "fields.['System.History']" -o tsv | grep -q "bmad-sync-{{correlation_token}}"
+      
+      # Get assigned user
+      get_assignee: |
+        az boards work-item show --id {{work_item_id}} --org {{org_url}} --query "fields.['System.AssignedTo'].uniqueName" -o tsv
+      
+      # Sync ownership from Azure DevOps to BMAD
+      sync_ownership: |
+        az boards work-item show --id {{work_item_id}} --org {{org_url}} --query "{user: fields.['System.AssignedTo'].uniqueName, acquired_at: fields.['System.ChangedDate']}" -o json
+      
+      # Get iteration path
+      get_iteration: |
+        az boards work-item show --id {{work_item_id}} --org {{org_url}} --query "fields.['System.IterationPath']" -o tsv
+      
+      # Get area path
+      get_area: |
+        az boards work-item show --id {{work_item_id}} --org {{org_url}} --query "fields.['System.AreaPath']" -o tsv
+      
+      # Get priority and story points
+      get_planning_fields: |
+        az boards work-item show --id {{work_item_id}} --org {{org_url}} --query "{priority: fields.['Microsoft.VSTS.Common.Priority'], points: fields.['Microsoft.VSTS.Scheduling.StoryPoints']}" -o json
 
 # Workflow behavior matrix reference:
 # | Workflow       | Step                | GitHub                              | Azure DevOps                                    |

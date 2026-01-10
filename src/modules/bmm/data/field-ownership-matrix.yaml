@@ -1,0 +1,292 @@
+# Field Ownership Matrix for Bi-Directional DevOps Sync
+# Defines authority and sync rules for each field to prevent conflicts
+
+# OWNERSHIP TYPES:
+# - bmad: BMAD YAML files are authoritative (DevOps receives updates from BMAD)
+# - devops: DevOps system is authoritative (BMAD receives updates from DevOps)
+# - merge: Both systems can update, requires merge strategy
+
+ownership_rules:
+  
+  # Core Identity Fields
+  bmad_id:
+    authority: bmad
+    immutable: true
+    description: "UUID assigned when story created in BMAD, never changes"
+    sync_direction: bmad_to_devops
+    devops_field_mapping:
+      github: "custom field or tag: bmad:{{bmad_id}}"
+      azure_devops: "custom field: BMAD.ID"
+  
+  ado_id:
+    authority: devops
+    immutable: true
+    description: "Work item ID assigned by Azure DevOps"
+    sync_direction: devops_to_bmad
+    devops_field_mapping:
+      azure_devops: "System.Id"
+  
+  github_issue:
+    authority: devops
+    immutable: true
+    description: "Issue number assigned by GitHub"
+    sync_direction: devops_to_bmad
+    devops_field_mapping:
+      github: "issue number"
+  
+  # Execution State Fields (BMAD owns workflow execution)
+  status:
+    authority: bmad
+    description: "Story workflow status (backlog, ready-for-dev, in-progress, review, done)"
+    sync_direction: bmad_to_devops
+    devops_field_mapping:
+      github: "labels: status-{{status}}"
+      azure_devops: "System.State (mapped: backlog→New, ready-for-dev→Active, in-progress→Active, review→Resolved, done→Closed)"
+    conflict_strategy: bmad_wins
+  
+  acceptance_criteria:
+    authority: bmad
+    description: "Technical acceptance criteria for story completion"
+    sync_direction: bmad_to_devops
+    devops_field_mapping:
+      github: "issue body section ## Acceptance Criteria"
+      azure_devops: "Microsoft.VSTS.Common.AcceptanceCriteria"
+    conflict_strategy: bmad_wins
+  
+  tasks:
+    authority: bmad
+    description: "Task breakdown and checklist"
+    sync_direction: bmad_to_devops
+    devops_field_mapping:
+      github: "issue body section ## Tasks / Subtasks (markdown checkboxes)"
+      azure_devops: "child Task work items with parent relation"
+    conflict_strategy: bmad_wins
+  
+  dev_notes:
+    authority: bmad
+    description: "Developer implementation notes and architecture references"
+    sync_direction: bmad_to_devops
+    devops_field_mapping:
+      github: "issue body section ## Dev Notes"
+      azure_devops: "System.Description section ## Dev Notes"
+    conflict_strategy: bmad_wins
+  
+  # Human Coordination Fields (DevOps owns team management)
+  assigned_to:
+    authority: devops
+    description: "User assigned to work on this story"
+    sync_direction: devops_to_bmad
+    devops_field_mapping:
+      github: "assignee"
+      azure_devops: "System.AssignedTo"
+    conflict_strategy: devops_wins
+  
+  iteration_path:
+    authority: devops
+    description: "Sprint/iteration assignment"
+    sync_direction: devops_to_bmad
+    devops_field_mapping:
+      github: "milestone"
+      azure_devops: "System.IterationPath"
+    conflict_strategy: devops_wins
+  
+  area_path:
+    authority: devops
+    description: "Team/area assignment (Azure DevOps only)"
+    sync_direction: devops_to_bmad
+    devops_field_mapping:
+      azure_devops: "System.AreaPath"
+    conflict_strategy: devops_wins
+  
+  priority:
+    authority: devops
+    description: "Story priority ranking"
+    sync_direction: devops_to_bmad
+    devops_field_mapping:
+      github: "labels: priority-{{priority}}"
+      azure_devops: "Microsoft.VSTS.Common.Priority"
+    conflict_strategy: devops_wins
+  
+  story_points:
+    authority: devops
+    description: "Effort estimate"
+    sync_direction: devops_to_bmad
+    devops_field_mapping:
+      github: "labels: points-{{points}}"
+      azure_devops: "Microsoft.VSTS.Scheduling.StoryPoints"
+    conflict_strategy: devops_wins
+  
+  tags:
+    authority: devops
+    description: "Custom labels/tags"
+    sync_direction: devops_to_bmad
+    devops_field_mapping:
+      github: "labels"
+      azure_devops: "System.Tags"
+    conflict_strategy: merge_union
+  
+  # Merge Fields (Both systems can update)
+  title:
+    authority: merge
+    description: "Story title"
+    sync_direction: bidirectional
+    devops_field_mapping:
+      github: "title"
+      azure_devops: "System.Title"
+    conflict_strategy: manual_review
+    merge_rules:
+      - "If both changed: flag for manual review"
+      - "If DevOps changed first: DevOps wins (user intent)"
+      - "If BMAD changed first: BMAD wins (agent refinement)"
+      - "Use last_synced_at timestamps to determine order"
+  
+  description:
+    authority: merge
+    description: "Story description and user story statement"
+    sync_direction: bidirectional
+    devops_field_mapping:
+      github: "issue body section ## Story"
+      azure_devops: "System.Description section ## Story"
+    conflict_strategy: manual_review
+    merge_rules:
+      - "If both changed: flag for manual review"
+      - "If only BMAD changed: BMAD wins"
+      - "If only DevOps changed: DevOps wins"
+      - "Use content hash to detect changes"
+  
+  # Sync Metadata (Internal tracking only)
+  sync:
+    authority: bmad
+    description: "Sync tracking metadata"
+    sync_direction: none
+    fields:
+      last_synced_from:
+        values: ["repo", "ado", "github", "manual"]
+      last_synced_at:
+        format: "ISO 8601 timestamp"
+      sync_hash:
+        description: "SHA256 hash of synced content for change detection"
+    conflict_strategy: system_managed
+  
+  # Ownership & Leasing (Multi-user coordination)
+  owner:
+    authority: devops
+    description: "Current owner with lease information"
+    sync_direction: devops_to_bmad
+    fields:
+      user:
+        description: "Email or username from DevOps system"
+        devops_field_mapping:
+          github: "assignee"
+          azure_devops: "System.AssignedTo"
+      acquired_at:
+        description: "When ownership was acquired"
+        format: "ISO 8601 timestamp"
+      lease_hours:
+        description: "Lease duration in hours"
+        default: 8
+      lease_expires_at:
+        description: "Calculated: acquired_at + lease_hours"
+        format: "ISO 8601 timestamp"
+    conflict_strategy: devops_wins
+    notes:
+      - "Agents must verify ownership before executing tasks"
+      - "Expired leases can be reclaimed"
+      - "Manual override possible via DevOps system"
+
+# Conflict Resolution Strategies
+conflict_strategies:
+  bmad_wins:
+    description: "BMAD value is used, DevOps value discarded"
+    use_when: "BMAD owns execution state and technical details"
+  
+  devops_wins:
+    description: "DevOps value is used, BMAD value discarded"
+    use_when: "DevOps owns human coordination and assignments"
+  
+  merge_union:
+    description: "Combine both values (e.g., union of tags)"
+    use_when: "Multiple sources of truth are valid"
+  
+  manual_review:
+    description: "Flag conflict for human review, optionally create PR"
+    use_when: "Cannot determine automatic resolution"
+    process:
+      - "Add conflict marker to YAML file"
+      - "Log conflict in sync metadata"
+      - "Optionally create PR with conflict details"
+      - "Block further sync until resolved"
+  
+  system_managed:
+    description: "System automatically manages, no user intervention"
+    use_when: "Internal sync tracking fields"
+
+# Loop Prevention
+loop_prevention:
+  correlation_token:
+    description: "Unique token added to each sync operation"
+    format: "bmad-sync-{{uuid}}"
+    storage:
+      github: "Comment with hidden marker: <!-- bmad-sync-{{uuid}} -->"
+      azure_devops: "System.History with marker [bmad-sync-{{uuid}}]"
+    rules:
+      - "Before syncing from DevOps to BMAD, check for correlation token"
+      - "If token found and matches recent BMAD→DevOps sync, skip update (loop detected)"
+      - "Correlation tokens expire after 1 hour"
+  
+  sync_hash:
+    description: "Content hash to detect actual changes vs. no-op updates"
+    algorithm: "SHA256"
+    includes:
+      - "Fields owned by the source system"
+      - "Excludes sync metadata itself"
+    rules:
+      - "Before syncing, compute hash of current state"
+      - "Compare with last_synced hash"
+      - "If identical, skip sync (no real change)"
+
+# Validation Rules
+validation:
+  required_fields:
+    - "bmad_id must be valid UUID"
+    - "status must be valid workflow state"
+    - "If ado_id exists, must be positive integer"
+    - "If github_issue exists, must be positive integer"
+  
+  sync_metadata:
+    - "last_synced_at must be valid ISO 8601 timestamp"
+    - "last_synced_from must be: repo | ado | github | manual"
+    - "sync_hash must be 64-char hex string (SHA256)"
+  
+  ownership:
+    - "If owner exists, user must not be empty"
+    - "If owner exists, acquired_at must be valid timestamp"
+    - "lease_hours must be positive integer"
+    - "lease_expires_at must be > acquired_at"
+
+# Usage Examples
+examples:
+  story_with_sync_metadata: |
+    <!-- bmad_id: 550e8400-e29b-41d4-a716-446655440000 -->
+    <!-- ado_id: 12345 -->
+    <!-- sync:
+      last_synced_from: ado
+      last_synced_at: 2025-01-10T09:30:00Z
+      sync_hash: a1b2c3d4e5f6...
+    -->
+    <!-- owner:
+      user: john.doe@company.com
+      acquired_at: 2025-01-10T08:00:00Z
+      lease_hours: 8
+      lease_expires_at: 2025-01-10T16:00:00Z
+    -->
+  
+  conflict_marker: |
+    <!-- SYNC CONFLICT DETECTED
+      field: title
+      bmad_value: "User Authentication System"
+      devops_value: "User Auth & Authorization"
+      last_synced_at: 2025-01-10T08:00:00Z
+      conflict_detected_at: 2025-01-10T10:00:00Z
+      resolution: manual_review_required
+    -->
