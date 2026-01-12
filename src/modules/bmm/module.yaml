@@ -54,3 +54,48 @@ tea_use_playwright_utils:
     - "Are you using playwright-utils (@seontechnologies/playwright-utils) in your project?\nYou must install packages yourself, or use test architect's *framework command."
   default: false
   result: "{value}"
+
+# DevOps Integration Settings
+tracking_system:
+  prompt:
+    - "Which tracking system do you want to use for sprint/story management?"
+    - "file-system: Local file tracking only (no external integration)"
+    - "github-issues: GitHub Issues + PRs via gh CLI (requires gh auth login)"
+    - "azure-devops: Azure Boards + PRs via az CLI (requires az login)"
+  default: "file-system"
+  result: "{value}"
+  single-select:
+    - value: "file-system"
+      label: "File System - Local tracking only, no external DevOps"
+    - value: "github-issues"
+      label: "GitHub Issues - Milestones, issues, and PRs via gh CLI"
+    - value: "azure-devops"
+      label: "Azure DevOps - Iterations, work items, and PRs via az CLI"
+
+tracking_repo:
+  prompt: "GitHub repository (owner/repo format) for issue tracking.\nLeave empty if not using GitHub Issues."
+  default: ""
+  result: "{value}"
+  condition: "tracking_system == 'github-issues'"
+
+tracking_azure_org:
+  prompt: "Azure DevOps organization URL (e.g., https://dev.azure.com/your-org).\nLeave empty if not using Azure DevOps."
+  default: ""
+  result: "{value}"
+  condition: "tracking_system == 'azure-devops'"
+
+tracking_azure_project:
+  prompt: "Azure DevOps project name.\nLeave empty if not using Azure DevOps."
+  default: ""
+  result: "{value}"
+  condition: "tracking_system == 'azure-devops'"
+
+sync_tasks_to_devops:
+  prompt:
+    - "Should story tasks/subtasks be created as child items in your tracking system?"
+    - "When enabled, tasks from story files will be created as:"
+    - "  - GitHub: Task list items in the issue body (GitHub doesn't support child issues)"
+    - "  - Azure DevOps: Child Task work items linked to the User Story"
+  default: false
+  result: "{value}"
+  condition: "tracking_system != 'file-system'"
