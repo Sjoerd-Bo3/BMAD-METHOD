@@ -1,3 +1,14 @@
+---
+bmad_id: {{bmad_id}}
+ado_id: null
+ado_url: null
+iteration_id: null
+iteration_path: null
+sync:
+  last_synced_from: null
+  last_synced_at: null
+---
+
 # Story {{epic_num}}.{{story_num}}: {{story_title}}
 
 Status: ready-for-dev
