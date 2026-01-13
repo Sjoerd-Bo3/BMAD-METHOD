@@ -53,3 +53,15 @@ development_status:
   2-2-chat-interface: backlog
   2-3-llm-integration: backlog
   epic-2-retrospective: optional
+
+# Story tracking references (auto-populated by create-story)
+tracking_refs:
+  1-1-user-authentication: 42
+  1-2-account-management: 43
+
+# BMAD Identity Mapping (auto-populated by create-story)
+# Maps story keys to stable UUIDs for bi-directional sync
+# Format: story-key: uuid-v4
+bmad_ids:
+  epic-1: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  1-1-user-authentication: "b2c3d4e5-f6a7-8901-bcde-f12345678901"

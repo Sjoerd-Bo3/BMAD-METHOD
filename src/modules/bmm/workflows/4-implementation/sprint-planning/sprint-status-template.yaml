@@ -38,12 +38,15 @@
 #   tracking_system: github-issues
 #   repo: owner/repo-name
 #   milestone: "Sprint: ProjectName - Epic 1"  # Created by sprint-planning
+#   milestone_number: 5                         # GitHub milestone number
 #
 # For Azure DevOps:
 #   tracking_system: azure-devops
 #   org_url: https://dev.azure.com/your-org
 #   project: YourProjectName
 #   iteration: "Sprint: ProjectName - Epic 1"  # Created by sprint-planning
+#   iteration_id: 12345                         # ADO iteration ID for API calls
+#   iteration_path: "\\Project\\Iteration\\Sprint 1"  # Full iteration path
 #
 # For File-System Only (no external tracking):
 #   tracking_system: file-system
@@ -91,3 +94,10 @@ development_status:
 tracking_refs:
   1-1-user-authentication: 42
   1-2-account-management: 43
+
+# BMAD Identity Mapping (auto-populated by create-story)
+# Maps story keys to stable UUIDs for bi-directional sync
+# Format: story-key: uuid-v4
+bmad_ids:
+  1-1-user-authentication: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  1-2-account-management: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
