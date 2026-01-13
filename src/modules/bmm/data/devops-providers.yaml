@@ -106,16 +106,24 @@ providers:
         az boards query --wiql "SELECT [System.Id], [System.Title] FROM workitems WHERE [System.WorkItemType] = 'Epic' AND [System.State] <> 'Closed'" --org {{org_url}} --project {{project}}
     
     # Work Item operations
+    # IMPORTANT: Use 2-step approach for iteration assignment:
+    #   1. Create work item with --project (don't use --iteration here, it's unreliable with --project)
+    #   2. Update iteration separately with --iteration
+    #   3. Query with show to get System.IterationId (not in create/update response)
     issue:
       create: |
-        az boards work-item create --title "{{story_key}}: {{title}}" --type "User Story" --description "{{description}}" --iteration "{{iteration_path}}" --org {{org_url}} --project {{project}}
-      create_no_iteration: |
         az boards work-item create --title "{{story_key}}: {{title}}" --type "User Story" --description "{{description}}" --org {{org_url}} --project {{project}}
+      create_with_iteration_unreliable: |
+        az boards work-item create --title "{{story_key}}: {{title}}" --type "User Story" --description "{{description}}" --iteration "{{iteration_path}}" --org {{org_url}} --project {{project}}
+      show: |
+        az boards work-item show --id {{work_item_id}} --org {{org_url}} -o json
+      show_iteration_fields: |
+        az boards work-item show --id {{work_item_id}} --org {{org_url}} -o json --query "fields.{IterationId: 'System.IterationId', IterationPath: 'System.IterationPath'}"
       close: |
         az boards work-item update --id {{work_item_id}} --state Closed --org {{org_url}}
       update: |
         az boards work-item update --id {{work_item_id}} --description "{{description}}" --org {{org_url}}
-      add_to_iteration: |
+      set_iteration: |
         az boards work-item update --id {{work_item_id}} --iteration "{{iteration_path}}" --org {{org_url}}
       link_to_parent: |
         az boards work-item relation add --id {{work_item_id}} --relation-type "System.LinkTypes.Hierarchy-Reverse" --target-id {{parent_id}} --org {{org_url}}
@@ -157,13 +165,54 @@ providers:
       project: "YourProjectName"
       tracking_ref: "work_item_id"
       iteration: "Sprint X"
+      iteration_id: "12345"
+      iteration_path: "\\Project\\Iteration\\Sprint X"
+
+# ============================================================================
+# BMAD Identity System (bmad_id)
+# ============================================================================
+# Every BMAD item (epic, story) has a stable UUID (bmad_id) for bi-directional sync.
+# 
+# Storage locations:
+#   - Story files: YAML frontmatter (bmad_id field)
+#   - Sprint-status.yaml: bmad_ids section mapping story-key to UUID
+#   - GitHub Issues: Hidden HTML comment in body "<!-- bmad_id:uuid -->"
+#   - Azure DevOps: Italic footer in description "---\n_bmad_id: uuid_"
+#
+# Provider-specific approaches:
+#   GITHUB:
+#     - HTML comments work! GitHub preserves them in issue body
+#     - Format: <!-- bmad_id:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx -->
+#     - Invisible when rendered, searchable via API
+#   
+#   AZURE DEVOPS:
+#     - ⚠️ HTML comments are STRIPPED from Description field!
+#     - ADO's multilineFieldsFormat is "html" which sanitizes comments
+#     - Use italic markdown footer instead: ---\n_bmad_id: uuid_
+#     - Subtle visual (small italic text at bottom) but survives sanitization
+#     - Searchable via WIQL: [System.Description] CONTAINS 'bmad_id: uuid'
+#
+# Sync metadata in story frontmatter:
+#   bmad_id: "uuid-v4"           # Immutable, never regenerated
+#   ado_id: 12345                # DevOps work item ID
+#   ado_url: "https://..."       # Direct link to work item
+#   iteration_id: 67890          # ADO iteration ID (for Azure DevOps)
+#   iteration_path: "\\Proj\\..."# Full iteration path
+#   sync:
+#     last_synced_from: repo|ado # Which system made last update
+#     last_synced_at: ISO8601    # Timestamp of last sync
+#
+# Lookup commands:
+#   GitHub: gh api search/issues -q "repo:owner/repo bmad_id:uuid in:body"
+#   Azure:  az boards query --wiql "SELECT * WHERE [System.Description] CONTAINS 'bmad_id: uuid'"
+# ============================================================================
 
 # Workflow behavior matrix reference:
 # | Workflow       | Step                | GitHub                              | Azure DevOps                                    |
 # |----------------|---------------------|-------------------------------------|-------------------------------------------------|
 # | sprint-planning| Create milestone    | gh api .../milestones               | az boards iteration project create              |
-# | sprint-planning| Create epic items   | gh issue create --label epic        | az boards work-item create --type Epic          |
-# | create-story   | Create tracking     | gh issue create --milestone         | az boards work-item create --iteration          |
+# | sprint-planning| Create epic items   | gh issue create (bmad in body)      | az boards work-item create (bmad in desc)       |
+# | create-story   | Create tracking     | gh issue create (bmad in body)      | az boards work-item create (bmad in desc)       |
 # | dev-story      | Create branch       | git checkout -b                     | git checkout -b                                 |
 # | dev-story      | Create PR           | gh pr create (with Closes #X)       | az repos pr create --work-items                 |
 # | code-review    | Post findings       | gh pr comment                       | az repos pr update                              |
