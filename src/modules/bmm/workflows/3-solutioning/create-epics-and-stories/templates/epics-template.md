@@ -1,6 +1,10 @@
 ---
 stepsCompleted: []
 inputDocuments: []
+bmad_ids:
+  # Epic and story UUIDs for bi-directional DevOps sync
+  # Auto-generated during epic/story creation
+  # Format: epic-N or N-M-story-title: uuid-v4
 ---
 
 # {{project_name}} - Epic Breakdown
