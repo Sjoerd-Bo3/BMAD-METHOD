@@ -203,6 +203,10 @@
   <step n="5" goal="Create comprehensive story file">
     <critical>📝 CREATE ULTIMATE STORY FILE - The developer's master implementation guide!</critical>
 
+    <!-- Generate stable identity for bi-directional DevOps sync -->
+    <action>Generate a new UUID v4 for this story: {{bmad_id}} = random UUID (format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx)</action>
+    <note>The bmad_id is immutable and MUST NEVER be regenerated for an existing story</note>
+
     <action>Initialize from template.md:
     {default_output_file}</action>
     <template-output file="{default_output_file}">story_header</template-output>
@@ -264,6 +268,11 @@
       <action>Find development_status key matching {{story_key}}</action>
       <action>Verify current status is "backlog" (expected previous state)</action>
       <action>Update development_status[{{story_key}}] = "ready-for-dev"</action>
+      
+      <!-- Store bmad_id in sprint-status for bi-directional sync -->
+      <action>Find or create bmad_ids section in sprint-status.yaml</action>
+      <action>Add bmad_ids[{{story_key}}] = "{{bmad_id}}"</action>
+      
       <action>Save file, preserving ALL comments and structure including STATUS DEFINITIONS</action>
     </check>
 
@@ -273,6 +282,7 @@
       **Story Details:**
       - Story ID: {{story_id}}
       - Story Key: {{story_key}}
+      - BMAD ID: {{bmad_id}}
       - File: {{story_file}}
       - Status: ready-for-dev
 

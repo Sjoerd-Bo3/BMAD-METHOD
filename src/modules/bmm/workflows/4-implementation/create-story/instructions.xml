@@ -259,6 +259,10 @@
   <step n="5" goal="Create comprehensive story file">
     <critical>📝 CREATE ULTIMATE STORY FILE - The developer's master implementation guide!</critical>
 
+    <!-- Generate stable identity for bi-directional DevOps sync -->
+    <action>Generate a new UUID v4 for this story: {{bmad_id}} = random UUID (format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx)</action>
+    <note>The bmad_id is immutable and MUST NEVER be regenerated for an existing story</note>
+
     <action>Initialize from template.md:
     {default_output_file}</action>
     <template-output file="{default_output_file}">story_header</template-output>
@@ -320,6 +324,11 @@
       <action>Find development_status key matching {{story_key}}</action>
       <action>Verify current status is "backlog" (expected previous state)</action>
       <action>Update development_status[{{story_key}}] = "ready-for-dev"</action>
+      
+      <!-- Store bmad_id in sprint-status for bi-directional sync -->
+      <action>Find or create bmad_ids section in sprint-status.yaml</action>
+      <action>Add bmad_ids[{{story_key}}] = "{{bmad_id}}"</action>
+      
       <action>Save file, preserving ALL comments and structure including STATUS DEFINITIONS</action>
     </check>
 
@@ -329,6 +338,7 @@
       **Story Details:**
       - Story ID: {{story_id}}
       - Story Key: {{story_key}}
+      - BMAD ID: {{bmad_id}}
       - File: {{story_file}}
       - Status: ready-for-dev
 
@@ -370,16 +380,26 @@
         <output>ℹ️ Tasks will be synced as GitHub task list checkboxes in issue body</output>
       </check>
       
+      <!-- Append hidden bmad_id marker to issue body (invisible in UI, searchable via API) -->
+      <action>Append to story body: "\n\n<!-- bmad_id:{{bmad_id}} -->"</action>
+      <note>Hidden HTML comment is invisible in GitHub UI but can be found via API search</note>
+      
       <!-- Create issue with milestone if available -->
       <check if="milestone is configured">
-        <action>Run: gh issue create --title "{{story_key}}: {{story_title}}" --body "$(cat {{story_file}})" --label "story,sprint" --milestone "{{milestone}}"</action>
+        <action>Run: gh issue create --title "{{story_key}}: {{story_title}}" --body "{{story_body_with_bmad_marker}}" --label "story,sprint" --milestone "{{milestone}}"</action>
       </check>
       <check if="milestone is NOT configured">
-        <action>Run: gh issue create --title "{{story_key}}: {{story_title}}" --body "$(cat {{story_file}})" --label "story,sprint"</action>
+        <action>Run: gh issue create --title "{{story_key}}: {{story_title}}" --body "{{story_body_with_bmad_marker}}" --label "story,sprint"</action>
       </check>
       
       <action>Capture issue number from command output</action>
       <action>Update sprint-status.yaml with tracking_ref: {{issue_number}} for this story key</action>
+      
+      <!-- Store ado_id and ado_url in story file frontmatter -->
+      <action>Update story file frontmatter: ado_id: {{issue_number}}</action>
+      <action>Update story file frontmatter: ado_url: "https://github.com/{{repo}}/issues/{{issue_number}}"</action>
+      <action>Update story file frontmatter: sync.last_synced_from: "repo"</action>
+      <action>Update story file frontmatter: sync.last_synced_at: "{{current_timestamp_iso}}"</action>
       
       <!-- Link to parent epic issue if available -->
       <check if="epic_issue_{{epic_num}} exists in sprint-status.yaml">
@@ -387,25 +407,44 @@
         <action>Add comment linking to parent epic: gh issue comment {{issue_number}} --body "Part of Epic #{{epic_issue_number}}"</action>
       </check>
       
-      <output>✅ GitHub Issue created: #{{issue_number}} (linked to milestone: {{milestone}})</output>
+      <output>✅ GitHub Issue created: #{{issue_number}} (linked to milestone: {{milestone}}, bmad_id: {{bmad_id}})</output>
     </check>
 
     <!-- Azure DevOps Provider -->
     <check if="{{tracking_system}} == 'azure-devops'">
       <action>Extract org_url and project from sprint-status.yaml</action>
-      <action>Extract iteration path from sprint-status.yaml (if configured)</action>
+      <action>Extract iteration_path from sprint-status.yaml (if configured)</action>
       <action>Prepare description from story file (truncate if needed for Azure DevOps limits)</action>
       
-      <!-- Create work item with iteration if available -->
-      <check if="iteration is configured">
-        <action>Run: az boards work-item create --title "{{story_key}}: {{story_title}}" --type "User Story" --description "{{story_description}}" --iteration "{{iteration_path}}" --org {{org_url}} --project {{project}}</action>
-      </check>
-      <check if="iteration is NOT configured">
-        <action>Run: az boards work-item create --title "{{story_key}}: {{story_title}}" --type "User Story" --description "{{story_description}}" --org {{org_url}} --project {{project}}</action>
+      <!-- Append bmad_id marker to description (subtle italic text at bottom, searchable via WIQL) -->
+      <action>Append to description: "\n\n---\n_bmad_id: {{bmad_id}}_"</action>
+      <note>ADO strips HTML comments from Description field - use italic markdown footer instead. Searchable via WIQL: [System.Description] CONTAINS 'bmad_id: xxx'</note>
+      
+      <!-- Step 1: Create work item WITHOUT iteration (--iteration with --project is unreliable) -->
+      <action>Run: az boards work-item create --title "{{story_key}}: {{story_title}}" --type "User Story" --description "{{description_with_bmad_marker}}" --org {{org_url}} --project {{project}}</action>
+      <action>Capture work_item_id from command output JSON (fields.id or id)</action>
+      
+      <!-- Step 2: Update iteration if configured (must be separate call) -->
+      <check if="iteration_path is configured">
+        <action>Run: az boards work-item update --id {{work_item_id}} --iteration "{{iteration_path}}" --org {{org_url}}</action>
+        <note>Iteration path format: "Project\Iteration Name" (not "Project\Iteration\Name")</note>
       </check>
       
-      <action>Capture work_item_id from command output</action>
+      <!-- Step 3: Query work item to get System.IterationId (not returned in create/update response) -->
+      <action>Run: az boards work-item show --id {{work_item_id}} --org {{org_url}} -o json</action>
+      <action>Extract iteration_id from response: fields.'System.IterationId'</action>
+      <action>Extract iteration_path from response: fields.'System.IterationPath' (use actual value, not input)</action>
+      
       <action>Update sprint-status.yaml with tracking_ref: {{work_item_id}} for this story key</action>
+      <action>Update sprint-status.yaml with iteration_id: {{iteration_id}} for this story key</action>
+      
+      <!-- Store ado_id, ado_url, and iteration_id in story file frontmatter -->
+      <action>Update story file frontmatter: ado_id: {{work_item_id}}</action>
+      <action>Update story file frontmatter: ado_url: "{{org_url}}/{{project}}/_workitems/edit/{{work_item_id}}"</action>
+      <action>Update story file frontmatter: iteration_id: {{iteration_id}}</action>
+      <action>Update story file frontmatter: iteration_path: "{{iteration_path}}"</action>
+      <action>Update story file frontmatter: sync.last_synced_from: "repo"</action>
+      <action>Update story file frontmatter: sync.last_synced_at: "{{current_timestamp_iso}}"</action>
       
       <!-- Link to parent epic work item if available -->
       <check if="epic_work_item_{{epic_num}} exists in sprint-status.yaml">
@@ -425,7 +464,7 @@
         <output>  ✅ Task created: #{{task_id}} - {{task_title}}</output>
       </check>
       
-      <output>✅ Azure DevOps Work Item created: #{{work_item_id}} (in iteration: {{iteration}})</output>
+      <output>✅ Azure DevOps Work Item created: #{{work_item_id}} (iteration: {{iteration_path}}, bmad_id: {{bmad_id}})</output>
     </check>
 
     <!-- Unknown provider -->
