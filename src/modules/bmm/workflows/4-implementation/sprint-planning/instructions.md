@@ -164,13 +164,17 @@ development_status:
   <action>Run: gh api repos/{repo}/milestones -f title="{{milestone_title}}" -f description="{{milestone_description}}"</action>
   <action>Capture milestone number from response</action>
   <action>Update {status_file} with milestone: {{milestone_title}}</action>
-  <output>✅ GitHub Milestone created: {{milestone_title}}</output>
+  <action>Update {status_file} with milestone_number: {{milestone_number}}</action>
+  <output>✅ GitHub Milestone created: {{milestone_title}} (#{{milestone_number}})</output>
   
-  <!-- Create Epic Issues -->
+  <!-- Create Epic Issues with bmad_id hidden in body for bi-directional sync -->
   <action>For each epic found in epic files:</action>
-  <action>Run: gh issue create --title "Epic {{epic_num}}: {{epic_title}}" --body "{{epic_description}}" --label "epic,{project_key}"</action>
+  <action>Generate a new UUID v4 for this epic: {{epic_bmad_id}} = random UUID</action>
+  <action>Append hidden marker to epic body: "\n\n<!-- bmad_id:{{epic_bmad_id}} -->"</action>
+  <action>Run: gh issue create --title "Epic {{epic_num}}: {{epic_title}}" --body "{{epic_body_with_bmad_marker}}" --label "epic,{project_key}"</action>
   <action>Capture epic issue number</action>
   <action>Store epic_issue_{{epic_num}} = issue number in sprint-status.yaml</action>
+  <action>Store bmad_ids["epic-{{epic_num}}"] = "{{epic_bmad_id}}" in sprint-status.yaml</action>
   <output>✅ GitHub Epic Issue created: #{{epic_issue_number}} - Epic {{epic_num}}: {{epic_title}}</output>
 </check>
 
@@ -183,15 +187,27 @@ development_status:
   <action>Calculate start_date = today</action>
   <action>Calculate end_date = today + 2 weeks (default sprint length)</action>
   <action>Run: az boards iteration project create --name "{{iteration_name}}" --path "\\{{project}}\\Iteration" --start-date "{{start_date}}" --finish-date "{{end_date}}" --org {{org_url}} --project {{project}}</action>
-  <action>Capture iteration path from response</action>
+  <action>Capture from JSON response:
+    - iteration_id = response.id (e.g., 2233)
+    - iteration_path_raw = response.path (e.g., "\Hollander-Deepsee\Iteration\SprintName")
+  </action>
+  <action>Convert iteration_path for work items: remove leading backslash and "\Iteration\" segment
+    - Example: "\Project\Iteration\SprintName" → "Project\SprintName"
+  </action>
   <action>Update {status_file} with iteration: {{iteration_name}}</action>
-  <output>✅ Azure DevOps Iteration created: {{iteration_name}}</output>
+  <action>Update {status_file} with iteration_id: {{iteration_id}}</action>
+  <action>Update {status_file} with iteration_path: {{iteration_path}} (converted format for work items)</action>
+  <output>✅ Azure DevOps Iteration created: {{iteration_name}} (ID: {{iteration_id}})</output>
   
-  <!-- Create Epic Work Items -->
+  <!-- Create Epic Work Items with bmad_id in description for bi-directional sync -->
+  <!-- Note: ADO strips HTML comments, so use italic markdown footer instead -->
   <action>For each epic found in epic files:</action>
-  <action>Run: az boards work-item create --title "Epic {{epic_num}}: {{epic_title}}" --type "Epic" --description "{{epic_description}}" --org {{org_url}} --project {{project}}</action>
-  <action>Capture work_item_id from response</action>
+  <action>Generate a new UUID v4 for this epic: {{epic_bmad_id}} = random UUID</action>
+  <action>Append bmad marker to epic description: "\n\n---\n_bmad_id: {{epic_bmad_id}}_"</action>
+  <action>Run: az boards work-item create --title "Epic {{epic_num}}: {{epic_title}}" --type "Epic" --description "{{epic_description_with_bmad_marker}}" --org {{org_url}} --project {{project}}</action>
+  <action>Capture work_item_id from response (response.id)</action>
   <action>Store epic_work_item_{{epic_num}} = work_item_id in sprint-status.yaml</action>
+  <action>Store bmad_ids["epic-{{epic_num}}"] = "{{epic_bmad_id}}" in sprint-status.yaml</action>
   <output>✅ Azure DevOps Epic created: #{{work_item_id}} - Epic {{epic_num}}: {{epic_title}}</output>
 </check>
 
