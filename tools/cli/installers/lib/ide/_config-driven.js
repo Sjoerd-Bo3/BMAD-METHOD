@@ -103,6 +103,7 @@ class ConfigDrivenIdeSetup extends BaseIdeSetup {
         fileExtension: targetConfig.file_extension || '.md',
         skipExisting: targetConfig.skip_existing || false,
         artifactTypes: targetConfig.artifact_types,
+        tools: this.installerConfig.tools || [],
       },
       options.selectedModules || [],
     );
@@ -171,6 +172,7 @@ class ConfigDrivenIdeSetup extends BaseIdeSetup {
           fileExtension: targetConfig.file_extension || '.md',
           skipExisting: targetConfig.skip_existing || false,
           artifactTypes: targetConfig.artifact_types,
+          tools: this.installerConfig.tools || [],
         },
         options.selectedModules || [],
       );

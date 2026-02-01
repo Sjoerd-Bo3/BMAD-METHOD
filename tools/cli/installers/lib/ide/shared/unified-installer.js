@@ -57,6 +57,9 @@ class UnifiedInstaller {
    * @returns {Promise<Object>} Installation result with counts
    */
   async install(projectDir, bmadDir, config, selectedModules = []) {
+    // Store config for use in template processing
+    this.currentConfig = config;
+
     const {
       targetDir,
       namingStyle = NamingStyle.SUFFIX_BASED,
@@ -135,32 +138,35 @@ class UnifiedInstaller {
       );
     }
 
-    // 3. Install Tasks and Tools from manifest CSV
+    // 3. Install Tasks and Tools from manifest CSV using artifact collection pattern
     if (installTasks || installTools) {
       const ttGen = new TaskToolCommandGenerator();
+      const { artifacts: ttArtifacts, counts: ttCounts } = await ttGen.collectTaskToolArtifacts(bmadDir);
 
-      // Use suffix-based naming if specified
-      if (namingStyle === NamingStyle.SUFFIX_BASED) {
-        const taskToolResult = await ttGen.generateSuffixBasedTaskToolCommands(
-          projectDir,
-          bmadDir,
+      // Filter artifacts based on what we want to install
+      const filteredArtifacts = ttArtifacts.filter((a) => {
+        if (a.type === 'task' && installTasks) return true;
+        if (a.type === 'tool' && installTools) return true;
+        return false;
+      });
+
+      // Write using unified writeArtifacts (handles naming styles, templates, etc.)
+      for (const artifact of filteredArtifacts) {
+        await this.writeArtifacts(
+          [artifact],
           targetDir,
-          fileExtension,
+          namingStyle,
           templateContent,
           frontmatterTemplate,
+          fileExtension,
+          customTemplateFn,
+          artifact.type,
           skipExisting,
         );
-        counts.tasks = taskToolResult.tasks || 0;
-        counts.tools = taskToolResult.tools || 0;
-      } else if (namingStyle === NamingStyle.FLAT_DASH) {
-        const taskToolResult = await ttGen.generateDashTaskToolCommands(projectDir, bmadDir, targetDir, fileExtension);
-        counts.tasks = taskToolResult.tasks || 0;
-        counts.tools = taskToolResult.tools || 0;
-      } else {
-        const taskToolResult = await ttGen.generateColonTaskToolCommands(projectDir, bmadDir, targetDir, fileExtension);
-        counts.tasks = taskToolResult.tasks || 0;
-        counts.tools = taskToolResult.tools || 0;
       }
+
+      counts.tasks = ttCounts.tasks || 0;
+      counts.tools = ttCounts.tools || 0;
     }
 
     counts.total = counts.agents + counts.workflows + counts.tasks + counts.tools;
@@ -209,6 +215,9 @@ class UnifiedInstaller {
     // Use artifact's description if available, otherwise generate fallback
     const description = artifact.description || `Activates the ${name} ${artifact.type || 'workflow'}.`;
 
+    // Determine the appropriate agent for prompt files that use {{agent}}
+    const agent = this.getAgentForArtifact(artifact);
+
     // Template variables
     const variables = {
       name,
@@ -217,10 +226,11 @@ class UnifiedInstaller {
       description,
       icon,
       content: contentWithoutFrontmatter,
+      agent,
 
       // Special variables for certain templates
       autoExecMode: this.getAutoExecMode(artifact),
-      tools: JSON.stringify(this.getCopilotTools()),
+      tools: this.currentConfig?.tools ? JSON.stringify(this.currentConfig.tools) : '[]',
     };
 
     // Apply template substitutions
@@ -235,7 +245,30 @@ class UnifiedInstaller {
       result = result.replace(/prompt = """/, `prompt = """\n${escapedContent}`);
     }
 
-    return result.trim() + '\n\n' + contentWithoutFrontmatter;
+    let finalContent = result.trim() + '\n\n' + contentWithoutFrontmatter;
+
+    return finalContent;
+  }
+
+  /**
+   * Get the appropriate agent for an artifact based on its module
+   * Maps BMAD modules to their primary agents for prompt file agent assignment
+   * Uses module-help.csv to find the workflow-to-agent mapping
+   * @param {Object} artifact - The artifact being processed
+   * @returns {string} The agent name to use (defaults to 'agent')
+   */
+  getAgentForArtifact(artifact) {
+    // If artifact has an associated agent from module-help.csv, use that
+    if (artifact.agent) {
+      // Convert agent name to BMAD format: analyst → bmad-bmm-analyst
+      const module = artifact.module || 'bmm';
+      return `bmad-${module}-${artifact.agent}`;
+    }
+
+    // Fallback: use a generic pattern based on the module
+    // For any module, default to bmad-{module}-master
+    const module = artifact.module || 'core';
+    return `bmad-${module}-master`;
   }
 
   /**
@@ -245,27 +278,6 @@ class UnifiedInstaller {
     if (artifact.type === 'agent') return '3';
     if (artifact.type === 'task' || artifact.type === 'tool') return '2';
     return '1'; // default for workflows
-  }
-
-  /**
-   * Get GitHub Copilot tools array
-   */
-  getCopilotTools() {
-    return [
-      'changes',
-      'edit',
-      'fetch',
-      'githubRepo',
-      'problems',
-      'runCommands',
-      'runTasks',
-      'runTests',
-      'search',
-      'runSubagent',
-      'testFailure',
-      'todos',
-      'usages',
-    ];
   }
 
   /**

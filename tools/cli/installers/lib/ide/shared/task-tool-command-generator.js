@@ -5,14 +5,75 @@ const chalk = require('chalk');
 const { toColonName, toColonPath, toDashPath, toSuffixBasedName } = require('./path-utils');
 
 /**
- * Generates command files for standalone tasks and tools
+ * Generates artifacts for standalone tasks and tools
+ * Follows the same pattern as WorkflowCommandGenerator
  */
 class TaskToolCommandGenerator {
+  constructor(bmadFolderName = 'bmad') {
+    this.bmadFolderName = bmadFolderName;
+  }
+
   /**
-   * REMOVED: Old generateTaskToolCommands method that created nested structure.
-   * This was causing bugs where files were written to wrong directories.
-   * Use generateColonTaskToolCommands() or generateDashTaskToolCommands() instead.
+   * Collect task and tool artifacts for installation
+   * Returns artifacts that can be processed by the unified installer's writeArtifacts
+   * @param {string} bmadDir - BMAD installation directory
+   * @returns {Object} { artifacts, counts: { tasks, tools } }
    */
+  async collectTaskToolArtifacts(bmadDir) {
+    const tasks = await this.loadTaskManifest(bmadDir);
+    const tools = await this.loadToolManifest(bmadDir);
+
+    // Load agent mapping from module-help.csv files
+    const agentMap = await this.loadAgentMapping(bmadDir);
+
+    // Filter to only standalone items
+    const standaloneTasks = tasks ? tasks.filter((t) => t.standalone === 'true' || t.standalone === true) : [];
+    const standaloneTools = tools ? tools.filter((t) => t.standalone === 'true' || t.standalone === true) : [];
+
+    const artifacts = [];
+
+    // Collect task artifacts
+    for (const task of standaloneTasks) {
+      const agent = agentMap.get(task.name) || null;
+
+      artifacts.push({
+        type: 'task',
+        name: task.name,
+        displayName: task.displayName || task.name,
+        description: task.description || `Execute ${task.displayName || task.name}`,
+        module: task.module,
+        agent,
+        path: task.path,
+        relativePath: path.join(task.module, 'tasks', `${task.name}.md`),
+        content: this.generateContent(task, 'task'),
+      });
+    }
+
+    // Collect tool artifacts
+    for (const tool of standaloneTools) {
+      const agent = agentMap.get(tool.name) || null;
+
+      artifacts.push({
+        type: 'tool',
+        name: tool.name,
+        displayName: tool.displayName || tool.name,
+        description: tool.description || `Execute ${tool.displayName || tool.name}`,
+        module: tool.module,
+        agent,
+        path: tool.path,
+        relativePath: path.join(tool.module, 'tools', `${tool.name}.md`),
+        content: this.generateContent(tool, 'tool'),
+      });
+    }
+
+    return {
+      artifacts,
+      counts: {
+        tasks: standaloneTasks.length,
+        tools: standaloneTools.length,
+      },
+    };
+  }
 
   /**
    * Load task manifest CSV
@@ -297,6 +358,86 @@ class TaskToolCommandGenerator {
       tasks: standaloneTasks.length,
       tools: standaloneTools.length,
     };
+  }
+
+  /**
+   * Load agent mapping from module-help.csv files
+   * Dynamically discovers modules by scanning for module-help.csv
+   * @param {string} bmadDir - BMAD installation directory
+   * @returns {Map<string, string>} Map of item name to agent name
+   */
+  async loadAgentMapping(bmadDir) {
+    const agentMap = new Map();
+
+    if (!(await fs.pathExists(bmadDir))) {
+      return agentMap;
+    }
+
+    try {
+      const entries = await fs.readdir(bmadDir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const helpFilePath = path.join(bmadDir, entry.name, 'module-help.csv');
+
+          if (await fs.pathExists(helpFilePath)) {
+            try {
+              const csvContent = await fs.readFile(helpFilePath, 'utf8');
+              const rows = csv.parse(csvContent, {
+                columns: true,
+                skip_empty_lines: true,
+              });
+
+              for (const row of rows) {
+                const itemName = row.name?.toLowerCase().replaceAll(' ', '-') || '';
+                const agent = row.agent;
+
+                if (itemName && agent) {
+                  agentMap.set(itemName, agent);
+
+                  // Also map by command name if different
+                  if (row.command) {
+                    const cmdParts = row.command.split('_');
+                    if (cmdParts.length >= 3) {
+                      const cmdItemName = cmdParts.slice(2).join('-');
+                      agentMap.set(cmdItemName, agent);
+                    }
+                  }
+                }
+              }
+            } catch {
+              // Silently skip if module-help.csv can't be parsed
+            }
+          }
+        }
+      }
+    } catch {
+      // Silently return empty if can't read directory
+    }
+
+    return agentMap;
+  }
+
+  /**
+   * Generate raw content for a task or tool (without frontmatter)
+   * Used by collectTaskToolArtifacts - frontmatter is applied by unified installer
+   * @param {Object} item - Task or tool item from manifest
+   * @param {string} type - 'task' or 'tool'
+   * @returns {string} Content for the command file
+   */
+  generateContent(item, type) {
+    // Convert path to use {project-root} placeholder
+    let itemPath = item.path;
+    if (itemPath.startsWith('bmad/')) {
+      itemPath = `{project-root}/${itemPath}`;
+    }
+
+    return `# ${item.displayName || item.name}
+
+LOAD and execute the ${type} at: ${itemPath}
+
+Follow all instructions in the ${type} file exactly as written.
+`;
   }
 
   /**

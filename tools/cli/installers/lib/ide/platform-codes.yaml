@@ -87,11 +87,38 @@ platforms:
       targets:
         - dir: .github/agents
           frontmatter_template: copilot-agent.md
+          file_extension: .agent.md
           artifact_types: [agents]
         - dir: .github/prompts
           frontmatter_template: copilot.md
+          file_extension: .prompt.md
           artifact_types: [workflows, tasks, tools]
       has_vscode_settings: true
+      # Copilot tools available for prompts - update as VS Code adds new tools
+      tools:
+        - changes
+        - edit
+        - editFiles
+        - extensions
+        - fetch
+        - findTestFiles
+        - githubRepo
+        - new
+        - openSimpleBrowser
+        - problems
+        - runCommands
+        - runTasks
+        - runInTerminal
+        - runNotebooks
+        - runTests
+        - search
+        - searchResults
+        - terminalLastCommand
+        - terminalSelection
+        - testFailure
+        - thinking
+        - usages
+        - vscodeAPI
 
   iflow:
     name: "iFlow"

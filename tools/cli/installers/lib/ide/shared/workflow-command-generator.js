@@ -26,6 +26,9 @@ class WorkflowCommandGenerator {
       return { artifacts: [], counts: { commands: 0, launchers: 0 } };
     }
 
+    // Load workflow-to-agent mapping from module-help.csv files
+    const workflowAgentMap = await this.loadWorkflowAgentMapping(bmadDir);
+
     // ALL workflows now generate commands - no standalone filtering
     const allWorkflows = workflows;
 
@@ -33,12 +36,17 @@ class WorkflowCommandGenerator {
 
     for (const workflow of allWorkflows) {
       const commandContent = await this.generateCommandContent(workflow, bmadDir);
+
+      // Look up the agent for this workflow from module-help.csv
+      const agent = workflowAgentMap.get(workflow.name) || null;
+
       artifacts.push({
         type: 'workflow-command',
         name: workflow.name,
         displayName: workflow.displayName || workflow.name,
         description: workflow.description,
         module: workflow.module,
+        agent, // Agent from module-help.csv
         relativePath: path.join(workflow.module, 'workflows', `${workflow.name}.md`),
         content: commandContent,
         sourcePath: workflow.path,
@@ -63,6 +71,89 @@ class WorkflowCommandGenerator {
         launchers: Object.keys(groupedWorkflows).length,
       },
     };
+  }
+
+  /**
+   * Load workflow-to-agent mapping from module-help.csv files
+   * @param {string} bmadDir - BMAD installation directory
+   * @returns {Map<string, string>} Map of workflow name to agent name
+   */
+  async loadWorkflowAgentMapping(bmadDir) {
+    const workflowAgentMap = new Map();
+
+    // Dynamically discover modules by scanning bmadDir for directories with module-help.csv
+    const modules = await this.discoverModulesWithHelp(bmadDir);
+
+    for (const moduleName of modules) {
+      const helpFilePath = path.join(bmadDir, moduleName, 'module-help.csv');
+
+      if (await fs.pathExists(helpFilePath)) {
+        try {
+          const csvContent = await fs.readFile(helpFilePath, 'utf8');
+          const rows = csv.parse(csvContent, {
+            columns: true,
+            skip_empty_lines: true,
+          });
+
+          for (const row of rows) {
+            // Extract workflow name from command column (e.g., bmad_bmm_create-story → create-story)
+            // or from the name column
+            const workflowName = row.name?.toLowerCase().replaceAll(' ', '-') || '';
+            const agent = row.agent;
+
+            if (workflowName && agent) {
+              workflowAgentMap.set(workflowName, agent);
+
+              // Also map by the command name if different
+              if (row.command) {
+                // Extract the workflow name part from command like bmad_bmm_create-story
+                const cmdParts = row.command.split('_');
+                if (cmdParts.length >= 3) {
+                  const cmdWorkflowName = cmdParts.slice(2).join('-');
+                  workflowAgentMap.set(cmdWorkflowName, agent);
+                }
+              }
+            }
+          }
+        } catch {
+          // Silently skip if module-help.csv can't be parsed
+        }
+      }
+    }
+
+    return workflowAgentMap;
+  }
+
+  /**
+   * Discover modules that have module-help.csv files
+   * Scans the bmadDir for subdirectories containing module-help.csv
+   * This supports both standard modules (core, bmm) and custom modules
+   * @param {string} bmadDir - BMAD installation directory
+   * @returns {string[]} Array of module names
+   */
+  async discoverModulesWithHelp(bmadDir) {
+    const modules = [];
+
+    if (!(await fs.pathExists(bmadDir))) {
+      return modules;
+    }
+
+    try {
+      const entries = await fs.readdir(bmadDir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const helpFilePath = path.join(bmadDir, entry.name, 'module-help.csv');
+          if (await fs.pathExists(helpFilePath)) {
+            modules.push(entry.name);
+          }
+        }
+      }
+    } catch {
+      // Silently return empty if can't read directory
+    }
+
+    return modules;
   }
 
   /**

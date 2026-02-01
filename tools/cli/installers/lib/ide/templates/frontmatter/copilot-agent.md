@@ -1,5 +1,6 @@
 ---
-description: "{{description}}"
+name: '{{name}}'
+description: '{{description}}'
 tools: {{tools}}
 ---
 
